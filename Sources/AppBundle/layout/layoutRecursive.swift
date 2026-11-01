@@ -73,7 +73,12 @@ extension Window {
         let workspace = context.workspace
         let windowRect = try await getAxRect(.cancellable) // Probably not idempotent
         let currentMonitor = windowRect?.center.monitorApproximation
-        if let currentMonitor, let windowRect, workspace != currentMonitor.activeWorkspace {
+        // The second condition rescues floating windows stranded in the hide corner. It happens when the window dies
+        // while hidden (screen lock, app hides its window on close) and closedWindowsCache restores it without
+        // prevUnhiddenProportionalPositionInsideWorkspaceRect, so unhideFromCorner has nothing to restore
+        if let currentMonitor, let windowRect,
+           workspace != currentMonitor.activeWorkspace || windowRect.isStranded(outside: currentMonitor.visibleRect)
+        {
             let windowTopLeftCorner = windowRect.topLeftCorner
             let xProportion = (windowTopLeftCorner.x - currentMonitor.visibleRect.topLeftX) / currentMonitor.visibleRect.width
             let yProportion = (windowTopLeftCorner.y - currentMonitor.visibleRect.topLeftY) / currentMonitor.visibleRect.height

@@ -62,4 +62,10 @@ extension Rect {
     var size: CGSize { CGSize(width: width, height: height) }
 
     func getDimension(_ orientation: Orientation) -> CGFloat { orientation == .h ? width : height }
+
+    /// True if less than `minVisible` points of this rect overlap `other` along either axis
+    func isStranded(outside other: Rect, minVisible: CGFloat = 20) -> Bool {
+        min(maxX, other.maxX) - max(minX, other.minX) < minVisible ||
+            min(maxY, other.maxY) - max(minY, other.minY) < minVisible
+    }
 }
