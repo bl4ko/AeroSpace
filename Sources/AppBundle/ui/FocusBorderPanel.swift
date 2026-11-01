@@ -19,21 +19,21 @@ func refreshFocusBorder() async throws {
     }
     let panel = focusBorder ?? FocusBorderPanel()
     focusBorder = panel
-    panel.show(around: rect, width: width, color: config.focusedBorderColor)
+    panel.show(around: rect, above: window.windowId, width: width, color: config.focusedBorderColor)
 }
 
-// ponytail: .floating level draws over unfocused floating windows that overlap the focused one.
-// Ordering right above the focused window needs private SkyLight APIs
 private final class FocusBorderPanel: NSPanelHud {
     override init() {
         super.init()
+        // Normal level + ordering right above the focused window. Its sheets/dialogs and windows in front stay on top
+        level = .normal
         ignoresMouseEvents = true
         hasShadow = false
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
         contentView?.wantsLayer = true
     }
 
-    func show(around rect: Rect, width: CGFloat, color: UInt32) {
+    func show(around rect: Rect, above windowId: UInt32, width: CGFloat, color: UInt32) {
         guard let layer = contentView?.layer else { return }
         layer.borderWidth = width
         layer.cornerRadius = windowCornerRadius + width
@@ -50,6 +50,6 @@ private final class FocusBorderPanel: NSPanelHud {
             width: rect.width + 2 * width,
             height: rect.height + 2 * width,
         ), display: true)
-        orderFrontRegardless()
+        order(.above, relativeTo: Int(windowId))
     }
 }
