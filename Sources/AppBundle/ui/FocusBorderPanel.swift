@@ -15,11 +15,16 @@ func refreshFocusBorder() async throws {
         focusBorder?.orderOut(nil)
         return
     }
-    // Tiling windows: the rect we just applied (the AX rect may lag behind). Fullscreen windows have none
-    guard let rect = window.isFloating ? try await window.getAxRect(.cancellable) : window.lastAppliedLayoutPhysicalRect else {
-        // A busy app can fail the AX read (e.g. while a terminal redraws). Keep the floating window's border instead of blinking
-        if !window.isFloating { focusBorder?.orderOut(nil) }
+    // Fullscreen windows have no applied tile rect and get no border
+    let tileRect = window.lastAppliedLayoutPhysicalRect
+    guard window.isFloating || tileRect != nil else {
+        focusBorder?.orderOut(nil)
         return
+    }
+    // The real frame, because apps with a minimum size overflow their tile. The AX read is queued after the frame we
+    // just set, and apps that resize late trigger another refresh
+    guard let rect = try await window.getAxRect(.cancellable) ?? tileRect else {
+        return // A busy app can fail the AX read (e.g. while a terminal redraws). Keep the border instead of blinking
     }
     let panel = focusBorder ?? FocusBorderPanel()
     focusBorder = panel
