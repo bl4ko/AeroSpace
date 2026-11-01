@@ -10,11 +10,15 @@ private let windowCornerRadius: CGFloat = 12
 func refreshFocusBorder() async throws {
     let width = CGFloat(config.focusedBorderWidth)
     guard width > 0, TrayMenuModel.shared.isEnabled,
-          let window = focus.windowOrNil, window.nodeWorkspace?.isVisible == true,
-          // Tiling windows: the rect we just applied (the AX rect may lag behind). Fullscreen windows have none
-          let rect = window.isFloating ? try await window.getAxRect(.cancellable) : window.lastAppliedLayoutPhysicalRect
+          let window = focus.windowOrNil, window.nodeWorkspace?.isVisible == true
     else {
         focusBorder?.orderOut(nil)
+        return
+    }
+    // Tiling windows: the rect we just applied (the AX rect may lag behind). Fullscreen windows have none
+    guard let rect = window.isFloating ? try await window.getAxRect(.cancellable) : window.lastAppliedLayoutPhysicalRect else {
+        // A busy app can fail the AX read (e.g. while a terminal redraws). Keep the floating window's border instead of blinking
+        if !window.isFloating { focusBorder?.orderOut(nil) }
         return
     }
     let panel = focusBorder ?? FocusBorderPanel()
@@ -27,6 +31,8 @@ private final class FocusBorderPanel: NSPanelHud {
         super.init()
         // Normal level + ordering right above the focused window. Its sheets/dialogs and windows in front stay on top
         level = .normal
+        // macOS plays a grow-in animation every time a window is shown, which made the border lag behind
+        animationBehavior = .none
         ignoresMouseEvents = true
         hasShadow = false
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
