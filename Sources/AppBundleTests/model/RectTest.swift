@@ -2,6 +2,11 @@
 import XCTest
 
 final class RectTest: XCTestCase {
+    func testTopLeftToCenter() {
+        let monitor = Rect(topLeftX: 0, topLeftY: 33, width: 1728, height: 1084)
+        assertEquals(monitor.topLeftToCenter(CGSize(width: 864, height: 600)), CGPoint(x: 432, y: 275))
+    }
+
     func testIsStranded() {
         let monitor = Rect(topLeftX: 0, topLeftY: 0, width: 1728, height: 1117)
         // Parked in the bottom right hide corner: 1px visible

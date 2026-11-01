@@ -76,16 +76,22 @@ extension Window {
         // The second condition rescues floating windows stranded in the hide corner. It happens when the window dies
         // while hidden (screen lock, app hides its window on close) and closedWindowsCache restores it without
         // prevUnhiddenProportionalPositionInsideWorkspaceRect, so unhideFromCorner has nothing to restore
-        if let currentMonitor, let windowRect,
-           workspace != currentMonitor.activeWorkspace || windowRect.isStranded(outside: currentMonitor.visibleRect)
-        {
-            let windowTopLeftCorner = windowRect.topLeftCorner
-            let xProportion = (windowTopLeftCorner.x - currentMonitor.visibleRect.topLeftX) / currentMonitor.visibleRect.width
-            let yProportion = (windowTopLeftCorner.y - currentMonitor.visibleRect.topLeftY) / currentMonitor.visibleRect.height
-
+        let isStranded = currentMonitor.map { windowRect?.isStranded(outside: $0.visibleRect) == true } ?? false
+        if let currentMonitor, let windowRect, workspace != currentMonitor.activeWorkspace || isStranded {
             let workspaceRect = workspace.workspaceMonitor.visibleRect
-            var newX = workspaceRect.topLeftX + xProportion * workspaceRect.width
-            var newY = workspaceRect.topLeftY + yProportion * workspaceRect.height
+            var newX: CGFloat
+            var newY: CGFloat
+            if isStranded { // The previous position is lost. Mapping the corner position would push it to the bottom right
+                let center = workspaceRect.topLeftToCenter(windowRect.size)
+                newX = center.x
+                newY = center.y
+            } else {
+                let windowTopLeftCorner = windowRect.topLeftCorner
+                let xProportion = (windowTopLeftCorner.x - currentMonitor.visibleRect.topLeftX) / currentMonitor.visibleRect.width
+                let yProportion = (windowTopLeftCorner.y - currentMonitor.visibleRect.topLeftY) / currentMonitor.visibleRect.height
+                newX = workspaceRect.topLeftX + xProportion * workspaceRect.width
+                newY = workspaceRect.topLeftY + yProportion * workspaceRect.height
+            }
 
             let windowWidth = windowRect.width
             let windowHeight = windowRect.height
