@@ -153,6 +153,9 @@ final class MacApp: AbstractApp {
             try disableAnimations(app: axApp.threadGuarded, job) {
                 try setFrame(window, topLeft, size, job)
             }
+            if let size, let actual = window.get(Ax.sizeAttr), actual.width > size.width + 1 || actual.height > size.height + 1 {
+                Task.startUnstructured { @MainActor in try await learnMinSize(windowId) }
+            }
         }
     }
 

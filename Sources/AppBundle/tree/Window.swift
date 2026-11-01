@@ -8,6 +8,8 @@ open class Window: TreeNode, Hashable {
     var isFullscreen: Bool = false
     var noOuterGapsInFullscreen: Bool = false
     var layoutReason: LayoutReason = .standard
+    // ponytail: only grows, so an app that later allows smaller windows keeps the old minimum until restart
+    var learnedMinSize: CGSize = .zero // The size the app refused to go below
 
     @MainActor
     init(id: UInt32, _ app: any AbstractApp, lastFloatingSize: CGSize?, parent: NonLeafTreeNodeObject, adaptiveWeight: CGFloat, index: Int) {

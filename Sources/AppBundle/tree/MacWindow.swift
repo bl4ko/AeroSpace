@@ -314,3 +314,19 @@ extension WindowDetectedCallback {
         }
     }
 }
+
+/// Remembers the size that the app refused to shrink below, so that the layout makes room for it
+@MainActor
+func learnMinSize(_ windowId: UInt32) async throws {
+    try await Task.sleep(for: .milliseconds(100)) // Slow apps may still be resizing
+    guard let window = Window.get(byId: windowId), let tile = window.lastAppliedLayoutPhysicalRect,
+          let actual = try await window.getAxSize(.cancellable) else { return }
+    let minSize = CGSize(
+        width: actual.width > tile.width + 1 ? max(actual.width, window.learnedMinSize.width) : window.learnedMinSize.width,
+        height: actual.height > tile.height + 1 ? max(actual.height, window.learnedMinSize.height) : window.learnedMinSize.height,
+    )
+    if minSize != window.learnedMinSize {
+        window.learnedMinSize = minSize
+        scheduleCancellableCompleteRefreshSession(.ax("learnMinSize"))
+    }
+}

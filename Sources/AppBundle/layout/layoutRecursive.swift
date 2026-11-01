@@ -1,4 +1,5 @@
 import AppKit
+import Common
 
 extension Workspace {
     @MainActor
@@ -54,6 +55,61 @@ extension TreeNode {
                 return // Nothing to do for weirdos
         }
     }
+}
+
+/// Splits `total` proportionally to `weights`, but gives every child at least its minimum. Expects the minimums to fit
+private func distribute(_ total: CGFloat, weights: [CGFloat], mins: [CGFloat]) -> [CGFloat] {
+    var atMin = Set<Int>()
+    while true {
+        let free = weights.indices.filter { !atMin.contains($0) }
+        let rest = total - atMin.map { mins[$0] }.reduce(0, +)
+        let freeWeight = free.map { weights[$0] }.reduce(0, +)
+        let sizes = weights.indices.map { i in
+            atMin.contains(i) ? mins[i] : freeWeight > 0 ? weights[i] * rest / freeWeight : rest / CGFloat(free.count)
+        }
+        let tooSmall = free.filter { sizes[$0] < mins[$0] }
+        if tooSmall.isEmpty { return sizes }
+        atMin.formUnion(tooSmall)
+    }
+}
+
+extension TreeNode {
+    /// The smallest size along `orientation` that fits the minimum sizes of all windows, tiled side by side
+    @MainActor
+    fileprivate func tilingMinSize(_ orientation: Orientation, _ context: LayoutContext) -> CGFloat {
+        switch nodeCases {
+            case .window(let window): window.learnedMinSize.get(orientation)
+            case .tilingContainer(let container) where container.layout == .tiles && container.orientation == orientation:
+                container.children.map { $0.tilingMinSize(orientation, context) }.reduce(0, +) +
+                    CGFloat(container.children.count - 1) * context.resolvedGaps.inner.get(orientation).toDouble()
+            case .tilingContainer(let container):
+                (container.children.map { $0.tilingMinSize(orientation, context) }.max() ?? 0) + container.stackPadding(orientation)
+            default: 0
+        }
+    }
+
+    /// The smallest size along `orientation` that fits the minimum sizes of all windows, if containers stack
+    @MainActor
+    fileprivate func stackedMinSize(_ orientation: Orientation) -> CGFloat {
+        switch nodeCases {
+            case .window(let window): window.learnedMinSize.get(orientation)
+            case .tilingContainer(let container):
+                (container.children.map { $0.stackedMinSize(orientation) }.max() ?? 0) + container.stackPadding(orientation)
+            default: 0
+        }
+    }
+}
+
+extension TilingContainer {
+    /// Space that accordion layout takes from each window to show its neighbors
+    @MainActor
+    fileprivate func stackPadding(_ orientation: Orientation) -> CGFloat {
+        self.orientation == orientation && children.count > 1 ? 2 * CGFloat(config.accordionPadding) : 0
+    }
+}
+
+extension CGSize {
+    fileprivate func get(_ orientation: Orientation) -> CGFloat { orientation == .h ? width : height }
 }
 
 private struct LayoutContext {
@@ -121,33 +177,51 @@ extension TilingContainer {
         var point = point
         var virtualPoint = virtual.topLeftCorner
 
-        guard let delta = ((orientation == .h ? width : height) - CGFloat(children.sumOfDouble { $0.getWeight(orientation) }))
+        let total = orientation == .h ? width : height
+        guard let delta = (total - CGFloat(children.sumOfDouble { $0.getWeight(orientation) }))
             .div(children.count) else { return }
+        for child in children {
+            child.setWeight(orientation, child.getWeight(orientation) + delta)
+        }
 
         let lastIndex = children.indices.last
+        let rawGap = context.resolvedGaps.inner.get(orientation).toDouble()
+        // Gaps. Consider 4 cases:
+        // 1. Multiple children. Layout first child
+        // 2. Multiple children. Layout last child
+        // 3. Multiple children. Layout child in the middle
+        // 4. Single child
+        let gaps = children.indices.map { i in rawGap - (i == 0 ? rawGap / 2 : 0) - (i == lastIndex ? rawGap / 2 : 0) }
+        // Unlike Hyprland, we can't force a size on macOS apps. Make room for their minimum sizes. If they don't fit even
+        // when nested containers stack, stack this container
+        let weights = children.map { CGFloat($0.getWeight(orientation)) }
+        func sizes(_ mins: [CGFloat]) -> [CGFloat]? {
+            let mins = zip(mins, gaps).map { $0 + CGFloat($1) }
+            return mins.reduce(0, +) <= total ? distribute(total, weights: weights, mins: mins) : nil
+        }
+        guard let sizes = sizes(children.map { $0.tilingMinSize(orientation, context) })
+            ?? sizes(children.map { $0.stackedMinSize(orientation) })
+        else {
+            try await layoutAccordion(point, width: width, height: height, virtual: virtual, context)
+            return
+        }
+
         for (i, child) in children.enumerated() {
-            child.setWeight(orientation, child.getWeight(orientation) + delta)
-            let rawGap = context.resolvedGaps.inner.get(orientation).toDouble()
-            // Gaps. Consider 4 cases:
-            // 1. Multiple children. Layout first child
-            // 2. Multiple children. Layout last child
-            // 3. Multiple children. Layout child in the middle
-            // 4. Single child   let rawGap = gaps.inner.get(orientation).toDouble()
-            let gap = rawGap - (i == 0 ? rawGap / 2 : 0) - (i == lastIndex ? rawGap / 2 : 0)
+            let size = sizes[i]
             try await child.layoutRecursive(
                 i == 0 ? point : point.addingOffset(orientation, rawGap / 2),
-                width: orientation == .h ? child.hWeight - gap : width,
-                height: orientation == .v ? child.vWeight - gap : height,
+                width: orientation == .h ? size - gaps[i] : width,
+                height: orientation == .v ? size - gaps[i] : height,
                 virtual: Rect(
                     topLeftX: virtualPoint.x,
                     topLeftY: virtualPoint.y,
-                    width: orientation == .h ? child.hWeight : width,
-                    height: orientation == .v ? child.vWeight : height,
+                    width: orientation == .h ? size : width,
+                    height: orientation == .v ? size : height,
                 ),
                 context,
             )
-            virtualPoint = orientation == .h ? virtualPoint.addingXOffset(child.hWeight) : virtualPoint.addingYOffset(child.vWeight)
-            point = orientation == .h ? point.addingXOffset(child.hWeight) : point.addingYOffset(child.vWeight)
+            virtualPoint = virtualPoint.addingOffset(orientation, size)
+            point = point.addingOffset(orientation, size)
         }
     }
 
