@@ -48,6 +48,23 @@ final class DwindleTest: XCTestCase {
         ]))
     }
 
+    func testMoveNodeToWorkspaceSplitsMostRecentWindow() async throws {
+        let target = Workspace.get(byName: "dest")
+        _ = try await addWindow(1, target, rect: Rect(topLeftX: 0, topLeftY: 0, width: 1000, height: 600))
+        _ = try await addWindow(2, target, rect: Rect(topLeftX: 500, topLeftY: 0, width: 500, height: 600))
+        assertEquals(TestWindow.new(id: 3, parent: Workspace.get(byName: name).rootTilingContainer).focusWindow(), true)
+
+        await parseCommand("move-node-to-workspace dest").cmdOrDie.run(.defaultEnv, .emptyStdin)
+
+        assertEquals(target.rootTilingContainer.layoutDescription, .h_tiles([
+            .window(1),
+            .v_tiles([
+                .window(2),
+                .window(3),
+            ]),
+        ]))
+    }
+
     func testDisabledAppendsToParent() async throws {
         config.dwindle = false
         let workspace = Workspace.get(byName: name)
