@@ -29,6 +29,21 @@ final class ConfigTest: XCTestCase {
         assertEquals(result.warnings, [])
     }
 
+    func testFocusedBorder() {
+        let result = parseConfig(
+            """
+            focused-border-width = 2
+            focused-border-color = '#7aa2f7'
+            """,
+        )
+        assertEquals(result.config.focusedBorderWidth, 2)
+        assertEquals(result.config.focusedBorderColor, 0xFF7A_A2F7)
+        assertEquals(parseConfig("focused-border-color = '#807aa2f7'").config.focusedBorderColor, 0x807A_A2F7)
+        assertEquals(parseConfig("focused-border-color = '7aa2f7'").strErrors,
+                     ["[ERROR] focused-border-color: Can't parse color '7aa2f7'. Expected '#RRGGBB' or '#AARRGGBB'"])
+        assertEquals(parseConfig("focused-border-color = '#7aa2'").strErrors.count, 1)
+    }
+
     func testConfigVersionOutOfBounds() {
         let result = parseConfig(
             """

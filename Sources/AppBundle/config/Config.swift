@@ -39,6 +39,8 @@ struct Config: ConvenienceMutable {
     var _indentForNestedContainersWithTheSameOrientation: Void = ()
     var enableNormalizationFlattenContainers: Bool = true
     var dwindle: Bool = false
+    var focusedBorderWidth: Int = 0
+    var focusedBorderColor: UInt32 = 0xFF7A_A2F7
     var _nonEmptyWorkspacesRootContainersLayoutOnStartup: Void = ()
     var defaultRootContainerLayout: Layout = .tiles
     var defaultRootContainerOrientation: DefaultContainerOrientation = .auto

@@ -138,6 +138,8 @@ private let configParser: [String: any ParserProtocol<Config>] = [
 
     "enable-normalization-flatten-containers": Parser(\.enableNormalizationFlattenContainers, parseBool),
     "dwindle": Parser(\.dwindle, parseBool),
+    "focused-border-width": Parser(\.focusedBorderWidth, parseInt),
+    "focused-border-color": Parser(\.focusedBorderColor, parseHexColor),
     "enable-normalization-opposite-orientation-for-nested-containers": Parser(\.enableNormalizationOppositeOrientationForNestedContainers, parseBool),
 
     "default-root-container-layout": Parser(\.defaultRootContainerLayout, parseLayout),
@@ -389,6 +391,16 @@ private func parseStartupRootContainerLayout(_ raw: OrderedJson, _ backtrace: Co
 private func parseLayout(_ raw: OrderedJson, _ backtrace: ConfigBacktrace) -> ResOrConfigParseDiagnostic<Layout> {
     parseString(raw, backtrace)
         .flatMap { $0.parseLayout().toResult(.init(backtrace, "Can't parse layout '\($0)'")) }
+}
+
+// '#RRGGBB' or '#AARRGGBB'
+func parseHexColor(_ raw: OrderedJson, _ backtrace: ConfigBacktrace) -> ResOrConfigParseDiagnostic<UInt32> {
+    parseString(raw, backtrace).flatMap { str in
+        let hex = str.hasPrefix("#") ? String(str.dropFirst()) : ""
+        return (hex.count == 6 || hex.count == 8 ? UInt32(hex, radix: 16) : nil)
+            .map { hex.count == 6 ? 0xFF00_0000 | $0 : $0 }
+            .toResult(.init(backtrace, "Can't parse color '\(str)'. Expected '#RRGGBB' or '#AARRGGBB'"))
+    }
 }
 
 private func skipParsing<T: Sendable>(_ value: T) -> @Sendable (_ raw: OrderedJson, _ backtrace: ConfigBacktrace) -> ResOrConfigParseDiagnostic<T> {
