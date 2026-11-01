@@ -48,6 +48,24 @@ final class DwindleTest: XCTestCase {
         ]))
     }
 
+    func testUnknownSizesAlternateOrientation() async throws { // e.g. windows detected at startup
+        let workspace = Workspace.get(byName: name)
+        for id: UInt32 in 1 ... 4 {
+            _ = try await addWindow(id, workspace)
+        }
+
+        assertEquals(workspace.rootTilingContainer.layoutDescription, .h_tiles([
+            .window(1),
+            .v_tiles([
+                .window(2),
+                .h_tiles([
+                    .window(3),
+                    .window(4),
+                ]),
+            ]),
+        ]))
+    }
+
     func testMoveNodeToWorkspaceSplitsMostRecentWindow() async throws {
         let target = Workspace.get(byName: "dest")
         _ = try await addWindow(1, target, rect: Rect(topLeftX: 0, topLeftY: 0, width: 1000, height: 600))

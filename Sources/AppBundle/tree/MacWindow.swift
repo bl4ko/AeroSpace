@@ -246,8 +246,10 @@ func unbindAndGetBindingDataForNewTilingWindow(_ workspace: Workspace, window: W
 // Hyprland's dwindle: split the most recent window along its longer side. The new window goes right/bottom
 @MainActor
 private func dwindleSplit(_ mruWindow: Window, _ parent: TilingContainer) -> BindingData {
+    // Sizes are unknown until the first layout (e.g. windows detected at startup). Then alternate like dwindle does
     let rect = mruWindow.lastAppliedLayoutPhysicalRect
-    let orientation: Orientation = rect.map { $0.width >= $0.height } ?? true ? .h : .v
+        ?? (parent.children.count == 1 ? mruWindow.nodeWorkspace?.workspaceMonitor.visibleRect : nil)
+    let orientation: Orientation = rect.map { $0.width >= $0.height ? Orientation.h : .v } ?? parent.orientation.opposite
     if parent.children.count == 1 {
         parent.changeOrientation(orientation)
         return BindingData(parent: parent, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
