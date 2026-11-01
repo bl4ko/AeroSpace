@@ -243,19 +243,18 @@ func unbindAndGetBindingDataForNewTilingWindow(_ workspace: Workspace, window: W
     }
 }
 
-// Hyprland's dwindle: split the most recent window along its longer side. The new window goes right/bottom
+// Hyprland's dwindle: split the most recent window. The new window goes right/bottom
 @MainActor
 private func dwindleSplit(_ mruWindow: Window, _ parent: TilingContainer) -> BindingData {
-    // Sizes are unknown until the first layout (e.g. windows detected at startup). Then alternate like dwindle does
-    let rect = mruWindow.lastAppliedLayoutPhysicalRect
-        ?? (parent.children.count == 1 ? mruWindow.nodeWorkspace?.workspaceMonitor.visibleRect : nil)
-    let orientation: Orientation = rect.map { $0.width >= $0.height ? Orientation.h : .v } ?? parent.orientation.opposite
+    // A lone window takes the whole workspace, so follow its shape. Nested splits alternate, which is what
+    // the longer side gives on regular monitors. Window rects can't be trusted here: they go stale between layouts
     if parent.children.count == 1 {
-        parent.changeOrientation(orientation)
+        let rect = mruWindow.lastAppliedLayoutPhysicalRect ?? mruWindow.nodeWorkspace?.workspaceMonitor.visibleRect
+        parent.changeOrientation(rect.map { $0.width >= $0.height ? .h : .v } ?? .h)
         return BindingData(parent: parent, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
     }
     let data = mruWindow.unbindFromParent()
-    let newParent = TilingContainer(parent: parent, adaptiveWeight: data.adaptiveWeight, orientation, .tiles, index: data.index)
+    let newParent = TilingContainer(parent: parent, adaptiveWeight: data.adaptiveWeight, parent.orientation.opposite, .tiles, index: data.index)
     mruWindow.bind(to: newParent, adaptiveWeight: WEIGHT_AUTO, index: 0)
     return BindingData(parent: newParent, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
 }

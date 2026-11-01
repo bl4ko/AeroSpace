@@ -48,6 +48,22 @@ final class DwindleTest: XCTestCase {
         ]))
     }
 
+    func testStaleSizeIsIgnoredForNestedSplits() async throws {
+        let workspace = Workspace.get(byName: name)
+        _ = try await addWindow(1, workspace, rect: Rect(topLeftX: 0, topLeftY: 0, width: 1000, height: 600))
+        // Stale rect from an older layout where the window was wide
+        _ = try await addWindow(2, workspace, rect: Rect(topLeftX: 0, topLeftY: 0, width: 1000, height: 600))
+        _ = try await addWindow(3, workspace)
+
+        assertEquals(workspace.rootTilingContainer.layoutDescription, .h_tiles([
+            .window(1),
+            .v_tiles([
+                .window(2),
+                .window(3),
+            ]),
+        ]))
+    }
+
     func testUnknownSizesAlternateOrientation() async throws { // e.g. windows detected at startup
         let workspace = Workspace.get(byName: name)
         for id: UInt32 in 1 ... 4 {
