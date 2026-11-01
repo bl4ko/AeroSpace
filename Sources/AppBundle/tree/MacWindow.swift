@@ -226,6 +226,9 @@ private func unbindAndGetBindingDataForNewTilingWindow(_ workspace: Workspace, w
     window?.unbindFromParent() // It's important to unbind to get correct data from below
     let mruWindow = workspace.mostRecentWindowRecursive
     if let mruWindow, let tilingParent = mruWindow.parent as? TilingContainer {
+        if config.dwindle && tilingParent.layout == .tiles {
+            return dwindleSplit(mruWindow, tilingParent)
+        }
         return BindingData(
             parent: tilingParent,
             adaptiveWeight: WEIGHT_AUTO,
@@ -238,6 +241,21 @@ private func unbindAndGetBindingDataForNewTilingWindow(_ workspace: Workspace, w
             index: INDEX_BIND_LAST,
         )
     }
+}
+
+// Hyprland's dwindle: split the most recent window along its longer side. The new window goes right/bottom
+@MainActor
+private func dwindleSplit(_ mruWindow: Window, _ parent: TilingContainer) -> BindingData {
+    let rect = mruWindow.lastAppliedLayoutPhysicalRect
+    let orientation: Orientation = rect.map { $0.width >= $0.height } ?? true ? .h : .v
+    if parent.children.count == 1 {
+        parent.changeOrientation(orientation)
+        return BindingData(parent: parent, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
+    }
+    let data = mruWindow.unbindFromParent()
+    let newParent = TilingContainer(parent: parent, adaptiveWeight: data.adaptiveWeight, orientation, .tiles, index: data.index)
+    mruWindow.bind(to: newParent, adaptiveWeight: WEIGHT_AUTO, index: 0)
+    return BindingData(parent: newParent, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
 }
 
 @MainActor
