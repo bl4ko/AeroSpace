@@ -7,15 +7,14 @@ import Common
 /// becomes nil, etc.) which tricks AeroSpace into thinking that all windows were closed.
 /// That's why every time a window dies AeroSpace caches the "entire world" (unless window is already presented in the cache)
 /// so that once the screen is unlocked, AeroSpace could restore windows to where they were
-@MainActor private var closedWindowsCache = FrozenWorld(workspaces: [], monitors: [], windowIds: [])
+@MainActor private var closedWindowsCache = FrozenWorld(workspaces: [], windowIds: [])
+@MainActor private var closedWindowsCacheDate: Date = .distantPast
 
 struct FrozenMonitor: Sendable {
     let topLeftCorner: CGPoint
-    let visibleWorkspace: String
 
     @MainActor init(_ monitor: Monitor) {
         topLeftCorner = monitor.rect.topLeftCorner
-        visibleWorkspace = monitor.activeWorkspace.name
     }
 }
 
@@ -40,12 +39,14 @@ struct FrozenWorkspace: Sendable {
 @MainActor func cacheClosedWindowIfNeeded() {
     let allWs = Workspace.all
     let allWindowIds = allWs.flatMap { collectAllWindowIdsRecursive($0) }.toSet()
-    if allWindowIds.isSubset(of: closedWindowsCache.windowIds) {
+    // Windows of a locked screen die together. Later deaths (e.g. macshot hides its window while capturing) need a fresh
+    // world, otherwise the restore moves windows back to where they were long ago
+    if allWindowIds.isSubset(of: closedWindowsCache.windowIds) && closedWindowsCacheDate.distance(to: .now) < 10 {
         return // already cached
     }
+    closedWindowsCacheDate = .now
     closedWindowsCache = FrozenWorld(
         workspaces: allWs.map { FrozenWorkspace($0) },
-        monitors: monitors.map(FrozenMonitor.init),
         windowIds: allWindowIds,
     )
 }
@@ -56,6 +57,8 @@ struct FrozenWorkspace: Sendable {
     }
     let monitors = monitors
     let topLeftCornerToMonitor = monitors.grouped { $0.rect.topLeftCorner }
+    // A returning window must not switch what the monitors show. The screen doesn't change while it's locked anyway
+    let visibleWorkspaces = monitors.map { ($0, $0.activeWorkspace) }
 
     for frozenWorkspace in closedWindowsCache.workspaces {
         let workspace = Workspace.get(byName: frozenWorkspace.name)
@@ -77,10 +80,8 @@ struct FrozenWorkspace: Sendable {
         }
     }
 
-    for monitor in closedWindowsCache.monitors {
-        _ = topLeftCornerToMonitor[monitor.topLeftCorner]?
-            .singleOrNil()?
-            .setActiveWorkspace(Workspace.get(byName: monitor.visibleWorkspace))
+    for (monitor, workspace) in visibleWorkspaces {
+        _ = monitor.setActiveWorkspace(workspace)
     }
     return true
 }
@@ -122,5 +123,5 @@ private func restoreTreeRecursive(frozenContainer: FrozenContainer, parent: NonL
 // That's why we have to reset the cache every time layout changes. The layout can only be changed by running commands
 // and with mouse manipulations
 @MainActor func resetClosedWindowsCache() {
-    closedWindowsCache = FrozenWorld(workspaces: [], monitors: [], windowIds: [])
+    closedWindowsCache = FrozenWorld(workspaces: [], windowIds: [])
 }
