@@ -60,17 +60,23 @@ struct FrozenWorkspace: Sendable {
     // A returning window must not switch what the monitors show. The screen doesn't change while it's locked anyway
     let visibleWorkspaces = monitors.map { ($0, $0.activeWorkspace) }
 
+    // Only restore the returning window's place. Rebuilding other trees loses their most recent window, so fullscreen
+    // and focus drift apart (macshot hides and shows its window on every screenshot). Windows of a locked screen each
+    // come back on their own
+    let windowId = newlyDetectedWindow.windowId
     for frozenWorkspace in closedWindowsCache.workspaces {
+        // macOS native fullscreen and hidden windows will get fixed by normalizations
+        let wasFloating = (frozenWorkspace.floatingWindows + frozenWorkspace.macosUnconventionalWindows).contains { $0.id == windowId }
+        guard wasFloating || frozenWorkspace.rootTilingNode.windowIds.contains(windowId) else { continue }
         let workspace = Workspace.get(byName: frozenWorkspace.name)
         _ = topLeftCornerToMonitor[frozenWorkspace.monitor.topLeftCorner]?
             .singleOrNil()?
             .setActiveWorkspace(workspace)
-        for frozenWindow in frozenWorkspace.floatingWindows {
-            MacWindow.get(byId: frozenWindow.id)?.bindAsFloatingWindow(to: workspace)
+        if wasFloating {
+            newlyDetectedWindow.bindAsFloatingWindow(to: workspace)
+            continue
         }
-        for frozenWindow in frozenWorkspace.macosUnconventionalWindows { // Will get fixed by normalizations
-            MacWindow.get(byId: frozenWindow.id)?.bindAsFloatingWindow(to: workspace)
-        }
+        let mostRecent = workspace.rootTilingContainer.mostRecentWindowRecursive
         let prevRoot = workspace.rootTilingContainer // Save prevRoot into a variable to avoid it being garbage collected earlier than needed
         let potentialOrphans = prevRoot.allLeafWindowsRecursive
         prevRoot.unbindFromParent()
@@ -78,12 +84,24 @@ struct FrozenWorkspace: Sendable {
         for window in (potentialOrphans - workspace.rootTilingContainer.allLeafWindowsRecursive) {
             try await window.relayoutWindow(on: workspace, .cancellable, forceTile: true)
         }
+        if mostRecent?.nodeWorkspace == workspace { mostRecent?.markAsMostRecentChild() }
     }
 
     for (monitor, workspace) in visibleWorkspaces {
         _ = monitor.setActiveWorkspace(workspace)
     }
     return true
+}
+
+extension FrozenContainer {
+    fileprivate var windowIds: [UInt32] {
+        children.flatMap { child -> [UInt32] in
+            switch child {
+                case .window(let window): [window.id]
+                case .container(let container): container.windowIds
+            }
+        }
+    }
 }
 
 @discardableResult
