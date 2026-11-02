@@ -35,4 +35,54 @@ final class FullscreenTakeoverTest: XCTestCase {
 
         assertTrue(w1.isFullscreen)
     }
+
+    func testFullscreenComesBackWhenPopupFloats() async throws { // Login popups tile briefly before a script floats them
+        let workspace = Workspace.get(byName: name)
+        let browser = TestWindow.new(id: 1, parent: workspace.rootTilingContainer)
+        assertTrue(browser.focusWindow())
+        browser.isFullscreen = true
+        try await workspace.layoutWorkspace()
+        let popup = TestWindow.new(id: 2, parent: workspace.rootTilingContainer)
+        assertTrue(popup.focusWindow())
+        try await workspace.layoutWorkspace()
+
+        popup.bind(to: workspace.floatingWindowsContainer, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
+        try await workspace.layoutWorkspace()
+
+        assertTrue(browser.isFullscreen)
+        assertFalse(popup.isFullscreen)
+    }
+
+    func testFullscreenComesBackWhenPopupCloses() async throws {
+        let workspace = Workspace.get(byName: name)
+        let browser = TestWindow.new(id: 1, parent: workspace.rootTilingContainer)
+        assertTrue(browser.focusWindow())
+        browser.isFullscreen = true
+        try await workspace.layoutWorkspace()
+        let popup = TestWindow.new(id: 2, parent: workspace.rootTilingContainer)
+        assertTrue(popup.focusWindow())
+        try await workspace.layoutWorkspace()
+
+        popup.unbindFromParent()
+        try await workspace.layoutWorkspace()
+
+        assertTrue(browser.isFullscreen)
+    }
+
+    func testTurningFullscreenOffKeepsItOff() async throws {
+        let workspace = Workspace.get(byName: name)
+        let w1 = TestWindow.new(id: 1, parent: workspace.rootTilingContainer)
+        let w2 = TestWindow.new(id: 2, parent: workspace.rootTilingContainer)
+        assertTrue(w1.focusWindow())
+        w1.isFullscreen = true
+        try await workspace.layoutWorkspace()
+
+        w1.isFullscreen = false
+        try await workspace.layoutWorkspace()
+        assertTrue(w2.focusWindow())
+        try await workspace.layoutWorkspace()
+
+        assertFalse(w1.isFullscreen)
+        assertFalse(w2.isFullscreen)
+    }
 }

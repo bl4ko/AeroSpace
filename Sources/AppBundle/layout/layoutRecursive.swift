@@ -4,15 +4,23 @@ import Common
 extension Workspace {
     @MainActor
     func layoutWorkspace() async throws {
-        if isEffectivelyEmpty { return }
-        // Like Omarchy (Hyprland's on_focus_under_fullscreen = 1): the focused tiling window takes over fullscreen
-        if let mostRecent = rootTilingContainer.mostRecentWindowRecursive, !mostRecent.isFullscreen,
-           let fullscreen = rootTilingContainer.allLeafWindowsRecursive.first(where: \.isFullscreen)
-        {
-            fullscreen.isFullscreen = false
-            mostRecent.isFullscreen = true
-            mostRecent.noOuterGapsInFullscreen = fullscreen.noOuterGapsInFullscreen
+        if isEffectivelyEmpty {
+            fullscreenHolder = nil
+            return
         }
+        // Like Omarchy (Hyprland's on_focus_under_fullscreen = 1): the focused tiling window takes over fullscreen.
+        // It also comes back when the fullscreen window floats or closes, e.g. a login popup that tiled until
+        // center-browser-popup.sh floated it
+        let tilingWindows = rootTilingContainer.allLeafWindowsRecursive
+        let leftTiling = fullscreenHolder?.takeIf { $0.nodeWorkspace == nil || $0.nodeWorkspace == self && !tilingWindows.contains($0) }
+        if let mostRecent = rootTilingContainer.mostRecentWindowRecursive,
+           let holder = tilingWindows.first(where: \.isFullscreen) ?? leftTiling, holder != mostRecent
+        {
+            holder.isFullscreen = false
+            mostRecent.isFullscreen = true
+            mostRecent.noOuterGapsInFullscreen = holder.noOuterGapsInFullscreen
+        }
+        fullscreenHolder = tilingWindows.first(where: \.isFullscreen)
         let rect = workspaceMonitor.visibleRectPaddedByOuterGaps
         // If monitors are aligned vertically and the monitor below has smaller width, then macOS may not allow the
         // window on the upper monitor to take full width. rect.height - 1 resolves this problem
