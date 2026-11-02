@@ -19,12 +19,14 @@ final class MacWindow: Window {
     static func getOrRegister(windowId: UInt32, macApp: MacApp) async throws -> MacWindow {
         if let existing = allWindowsMap[windowId] { return existing }
         let rect = try await macApp.getAxRect(windowId, .cancellable)
+        // Known windows go back where they were before AeroSpace restarted, instead of running on-window-detected again
+        let saved = isStartup ? savedPlacement(windowId: windowId, pid: macApp.pid) : nil
         let data = try await unbindAndGetBindingDataForNewWindow(
             windowId,
             macApp,
-            isStartup
+            saved?.workspace ?? (isStartup
                 ? (rect?.center.monitorApproximation ?? mainMonitor).activeWorkspace
-                : focus.workspace,
+                : focus.workspace),
             window: nil,
             .cancellable,
         )
@@ -35,7 +37,9 @@ final class MacWindow: Window {
         allWindowsMap[windowId] = window
 
         try await debugWindowsIfRecording(window, .cancellable)
-        if try await !restoreClosedWindowsCacheIfNeeded(newlyDetectedWindow: window) {
+        if let saved {
+            if saved.isFloating { window.bindAsFloatingWindow(to: saved.workspace) }
+        } else if try await !restoreClosedWindowsCacheIfNeeded(newlyDetectedWindow: window) {
             await tryOnWindowDetected(window)
         }
         return window
