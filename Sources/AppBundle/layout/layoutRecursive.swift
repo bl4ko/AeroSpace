@@ -9,10 +9,10 @@ extension Workspace {
             return
         }
         // Like Omarchy (Hyprland's on_focus_under_fullscreen = 1): the focused tiling window takes over fullscreen.
-        // It also comes back when the fullscreen window floats or closes, e.g. a login popup that tiled until
-        // center-browser-popup.sh floated it
+        // Only the fullscreen command turns it off. When the fullscreen window floats, closes or moves away (a login
+        // popup that center-browser-popup.sh floats, a window caught by a catch-all rule), fullscreen comes back
         let tilingWindows = rootTilingContainer.allLeafWindowsRecursive
-        let leftTiling = fullscreenHolder?.takeIf { $0.nodeWorkspace == nil || $0.nodeWorkspace == self && !tilingWindows.contains($0) }
+        let leftTiling = fullscreenHolder?.takeIf { !tilingWindows.contains($0) }
         if let mostRecent = rootTilingContainer.mostRecentWindowRecursive,
            let holder = tilingWindows.first(where: \.isFullscreen) ?? leftTiling, holder != mostRecent
         {

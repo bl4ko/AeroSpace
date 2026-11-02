@@ -85,4 +85,22 @@ final class FullscreenTakeoverTest: XCTestCase {
         assertFalse(w1.isFullscreen)
         assertFalse(w2.isFullscreen)
     }
+
+    func testFullscreenComesBackWhenNewWindowMovesAway() async throws { // e.g. screenshot tools caught by a catch-all rule
+        let workspace = Workspace.get(byName: name)
+        let browser = TestWindow.new(id: 1, parent: workspace.rootTilingContainer)
+        assertTrue(browser.focusWindow())
+        browser.isFullscreen = true
+        try await workspace.layoutWorkspace()
+        let window = TestWindow.new(id: 2, parent: workspace.rootTilingContainer)
+        assertTrue(window.focusWindow())
+        try await workspace.layoutWorkspace()
+
+        window.bind(to: Workspace.get(byName: "other").rootTilingContainer, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
+        assertTrue(browser.focusWindow())
+        try await workspace.layoutWorkspace()
+
+        assertTrue(browser.isFullscreen)
+        assertFalse(window.isFullscreen)
+    }
 }
