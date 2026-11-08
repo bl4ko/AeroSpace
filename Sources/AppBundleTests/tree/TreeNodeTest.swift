@@ -1,9 +1,23 @@
 @testable import AppBundle
+import Common
 import XCTest
 
 @MainActor
 final class TreeNodeTest: XCTestCase {
     override func setUp() async throws { setUpWorkspacesForTests() }
+
+    func testMostRecentWindowSkipsEmptiedFloatingContainer() { // e.g. Mail compose window closes
+        let workspace = Workspace.get(byName: name)
+        TestWindow.new(id: 1, parent: workspace.rootTilingContainer)
+        let mail = TestWindow.new(id: 2, parent: workspace.rootTilingContainer)
+        assertTrue(mail.focusWindow())
+        let compose = TestWindow.new(id: 3, parent: workspace.floatingWindowsContainer)
+
+        compose.unbindFromParent()
+
+        assertEquals(workspace.mostRecentWindowRecursive, mail)
+        assertEquals(workspace.toLiveFocus().windowOrNil, mail)
+    }
 
     func testChildParentCyclicReferenceMemoryLeak() {
         let workspace = Workspace.get(byName: name) // Don't cache root node

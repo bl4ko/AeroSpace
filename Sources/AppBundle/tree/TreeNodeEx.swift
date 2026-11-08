@@ -47,7 +47,10 @@ extension TreeNode {
     }
 
     var mostRecentWindowRecursive: Window? {
-        self as? Window ?? mostRecentChild?.mostRecentWindowRecursive
+        // Skip children without windows: binding a window marks its container as most recent, and the container stays
+        // on top after the window dies (a closed Mail compose or browser login popup left focus on an empty floating
+        // container, so focus and fullscreen jumped to an arbitrary window)
+        self as? Window ?? mruChildren.lazy.compactMap(\.mostRecentWindowRecursive).first
     }
 
     var anyLeafWindowRecursive: Window? {
