@@ -42,6 +42,7 @@ struct Config: ConvenienceMutable {
     var focusedBorderWidth: Int = 0
     var focusedBorderColor: UInt32 = 0xFF7A_A2F7
     var summonAppIds: [String] = []
+    var nativeFullscreenAppIds: [String] = []
     var _nonEmptyWorkspacesRootContainersLayoutOnStartup: Void = ()
     var defaultRootContainerLayout: Layout = .tiles
     var defaultRootContainerOrientation: DefaultContainerOrientation = .auto

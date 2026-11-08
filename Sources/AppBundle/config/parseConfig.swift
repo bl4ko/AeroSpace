@@ -141,6 +141,7 @@ private let configParser: [String: any ParserProtocol<Config>] = [
     "focused-border-width": Parser(\.focusedBorderWidth, parseInt),
     "focused-border-color": Parser(\.focusedBorderColor, parseHexColor),
     "summon-app-ids": Parser(\.summonAppIds, parseArrayOfStrings),
+    "native-fullscreen-app-ids": Parser(\.nativeFullscreenAppIds, parseArrayOfStrings),
     "enable-normalization-opposite-orientation-for-nested-containers": Parser(\.enableNormalizationOppositeOrientationForNestedContainers, parseBool),
 
     "default-root-container-layout": Parser(\.defaultRootContainerLayout, parseLayout),
